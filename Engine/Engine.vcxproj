@@ -22,6 +22,7 @@
     <ClCompile Include="entryPoint.cpp" />
     <ClCompile Include="src\common\logger.cpp" />
     <ClCompile Include="src\engine\kEngine.cpp" />
+    <ClCompile Include="src\engine\utils.cpp" />
     <ClCompile Include="src\engine\vkImage.cpp" />
     <ClCompile Include="src\engine\vkInitializer.cpp" />
     <ClCompile Include="src\window\window.cpp" />
@@ -34,6 +35,7 @@
     <ClInclude Include="src\common\typedef.h" />
     <ClInclude Include="src\engine\kEngine.h" />
     <ClInclude Include="src\engine\type.h" />
+    <ClInclude Include="src\engine\utils.h" />
     <ClInclude Include="src\engine\vkImage.h" />
     <ClInclude Include="src\engine\vkInitializer.h" />
     <ClInclude Include="src\window\window.h" />
@@ -45,6 +47,9 @@
     <ProjectReference Include="..\sdl\VisualC\SDL\SDL.vcxproj">
       <Project>{81ce8daf-ebb2-4761-8e45-b71abcca8c68}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\src\grid.comp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

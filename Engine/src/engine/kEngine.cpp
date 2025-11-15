@@ -7,6 +7,7 @@
 #include "kEngine.h"
 #include "vkInitializer.h"
 #include "vkImage.h"
+#include "utils.h"
 
 constexpr static bool useValidationLayer = true;
 KEngine* kEngine = nullptr;
@@ -29,6 +30,9 @@ void KEngine::init()
 	initSwapChain();
 	initCommand();
 	initSyncStructures();
+	initDescriptorSetLayout();
+	initDescriptorSet();
+	initPipeline();
 	kEngine = this;
 	mInitialized = true;
 }
@@ -104,8 +108,6 @@ void KEngine::draw()
 	uint swapchainImageIndex;
 	VkAcquireNextImageInfoKHR acquireInfo{};
 	acquireInfo.deviceMask = 1;
-
-	//acquireInfo.fence = VK_NULL_HANDLE;
 	acquireInfo.pNext = nullptr;
 	acquireInfo.semaphore = currentFrame().swapchainSemaphore;
 	acquireInfo.sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR;
@@ -277,6 +279,99 @@ void KEngine::initSyncStructures()
 		VK_CHECK(vkCreateSemaphore(mDevice, &semaphoreInfo, nullptr, &signalSemaphore));
 		mSignalSemaphores.push_back(signalSemaphore);
 	}
+}
+
+void KEngine::initDescriptorSetLayout()
+{
+	VkDescriptorSetLayoutBinding binding{};
+	binding.binding = 0;
+	binding.descriptorCount = 1;
+	binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo info{};
+	info.bindingCount = 1;
+	info.flags = 0;
+	info.pNext = nullptr;
+	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	info.pBindings = &binding;
+	
+	VK_CHECK(vkCreateDescriptorSetLayout(mDevice, &info, nullptr, &mComputeDescriptorSetLayout));
+	mMainDeletionQueue.push_back([=]() {
+		vkDestroyDescriptorSetLayout(mDevice, mComputeDescriptorSetLayout, nullptr);
+	});
+}
+
+void KEngine::initDescriptorSet()
+{
+	VkDescriptorPoolSize poolSize;
+	poolSize.descriptorCount = 1;
+	poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	VkDescriptorPoolCreateInfo poolInfo{};
+	poolInfo.flags = 0;
+	poolInfo.maxSets = 1;
+	poolInfo.pNext = nullptr;
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = &poolSize;
+
+	VK_CHECK(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &mDescriptorPool));
+
+	VkDescriptorSetAllocateInfo allocateInfo{};
+	allocateInfo.descriptorPool = mDescriptorPool;
+	allocateInfo.descriptorSetCount = 1;
+	allocateInfo.pNext = nullptr;
+	allocateInfo.pSetLayouts = &mComputeDescriptorSetLayout;
+	allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	vkAllocateDescriptorSets(mDevice, &allocateInfo, &mComputeDescriptorSet);
+	mMainDeletionQueue.push_back([=]() {
+		vkDestroyDescriptorPool(mDevice, mDescriptorPool, nullptr);
+	});
+}
+
+void KEngine::initPipeline()
+{
+	initComputePipeline();
+}
+
+void KEngine::initComputePipeline()
+{
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+	pipelineLayoutInfo.flags = 0;
+	pipelineLayoutInfo.pNext = nullptr;
+	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.pPushConstantRanges = nullptr;
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &mComputeDescriptorSetLayout;
+
+	vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &mComputePipelineLayout);
+	VkShaderModule computeShaderModule;
+	Utils::loadShader("src/shaders/spirv/grid.comp.spirv", mDevice, &computeShaderModule);
+	VkPipelineShaderStageCreateInfo stageInfo{};
+	stageInfo.flags = 0;
+	stageInfo.module = computeShaderModule;
+	stageInfo.pName = "main";
+	stageInfo.pNext = nullptr;
+	stageInfo.pSpecializationInfo = nullptr;
+	stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+
+	VkComputePipelineCreateInfo computePipelineInfo{};
+	computePipelineInfo.flags = 0;
+	computePipelineInfo.layout = mComputePipelineLayout;
+	computePipelineInfo.pNext = nullptr;
+	computePipelineInfo.stage = stageInfo;
+	computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+
+	vkCreateComputePipelines(mDevice, nullptr, 1, &computePipelineInfo, nullptr, &mComputePipeline);
+
+	vkDestroyShaderModule(mDevice, computeShaderModule, nullptr);
+	mMainDeletionQueue.push_back([=]() {
+		vkDestroyPipelineLayout(mDevice, mComputePipelineLayout, nullptr);
+		vkDestroyPipeline(mDevice, mComputePipeline, nullptr);
+	});
 }
 
 FrameData& KEngine::currentFrame()

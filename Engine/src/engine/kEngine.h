@@ -33,6 +33,10 @@ private:
 	void destroySwapChain();
 	void initCommand();
 	void initSyncStructures();
+	void initDescriptorSetLayout();
+	void initDescriptorSet();
+	void initPipeline();
+	void initComputePipeline();
 	FrameData& currentFrame();
 	void drawBackground();
 private:
@@ -61,4 +65,14 @@ private:
 	VmaAllocator			  mMemAllocator{ nullptr };
 	AllocatedImage			  mDrawImage;
 	DeletionQueue			  mMainDeletionQueue;
+
+
+	//descriptorSetlayout & set & pool
+	VkDescriptorPool		  mDescriptorPool{ nullptr };	
+	VkDescriptorSetLayout     mComputeDescriptorSetLayout{ nullptr };
+	VkDescriptorSet			  mComputeDescriptorSet{ nullptr };
+
+	//compute pipeline
+	VkPipelineLayout		  mComputePipelineLayout{ nullptr };
+	VkPipeline				  mComputePipeline{ nullptr };
 };
