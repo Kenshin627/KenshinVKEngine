@@ -118,6 +118,7 @@ void KEngine::draw()
 	VK_CHECK(vkResetCommandBuffer(currentFrame().commandBuffer, 0));
 	VkCommandBufferBeginInfo beginInfo = VkInitializer::createCommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VK_CHECK(vkBeginCommandBuffer(currentFrame().commandBuffer, &beginInfo));
+	vkutil::transitionImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 	drawBackground();
 	vkutil::transitionImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	vkutil::transitionImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -325,6 +326,23 @@ void KEngine::initDescriptorSet()
 	allocateInfo.pSetLayouts = &mComputeDescriptorSetLayout;
 	allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	vkAllocateDescriptorSets(mDevice, &allocateInfo, &mComputeDescriptorSet);
+
+	VkDescriptorImageInfo imageInfo{};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageInfo.imageView = mDrawImage.imageView;
+	imageInfo.sampler = VK_NULL_HANDLE;
+
+	VkWriteDescriptorSet writeDescriptorSet{};
+	writeDescriptorSet.descriptorCount = 1;
+	writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	writeDescriptorSet.dstArrayElement = 0;
+	writeDescriptorSet.dstBinding = 0;
+	writeDescriptorSet.dstSet = mComputeDescriptorSet;
+	writeDescriptorSet.pBufferInfo = nullptr;
+	writeDescriptorSet.pImageInfo = &imageInfo;
+	writeDescriptorSet.pNext = nullptr;
+	writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	vkUpdateDescriptorSets(mDevice, 1, &writeDescriptorSet, 0, nullptr);
 	mMainDeletionQueue.push_back([=]() {
 		vkDestroyDescriptorPool(mDevice, mDescriptorPool, nullptr);
 	});
@@ -346,7 +364,7 @@ void KEngine::initComputePipeline()
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &mComputeDescriptorSetLayout;
 
-	vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &mComputePipelineLayout);
+	VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &mComputePipelineLayout));
 	VkShaderModule computeShaderModule;
 	Utils::loadShader("src/shaders/spirv/grid.comp.spirv", mDevice, &computeShaderModule);
 	VkPipelineShaderStageCreateInfo stageInfo{};
@@ -365,7 +383,7 @@ void KEngine::initComputePipeline()
 	computePipelineInfo.stage = stageInfo;
 	computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 
-	vkCreateComputePipelines(mDevice, nullptr, 1, &computePipelineInfo, nullptr, &mComputePipeline);
+	VK_CHECK(vkCreateComputePipelines(mDevice, nullptr, 1, &computePipelineInfo, nullptr, &mComputePipeline));
 
 	vkDestroyShaderModule(mDevice, computeShaderModule, nullptr);
 	mMainDeletionQueue.push_back([=]() {
@@ -381,13 +399,17 @@ FrameData& KEngine::currentFrame()
 
 void KEngine::drawBackground()
 {
-	VkClearColorValue clearValue;
-	float flash = std::abs(std::sin(mFrameCounter / 120.f));
-	clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
-
-	VkImageSubresourceRange clearRange = VkInitializer::imageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-	vkutil::transitionImage(currentFrame().commandBuffer,mDrawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-	vkCmdClearColorImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+	vkCmdBindPipeline(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline);
+	//VkCommandBuffer                             commandBuffer,
+	//VkPipelineBindPoint                         pipelineBindPoint,
+	//VkPipelineLayout                            layout,
+	//uint32_t                                    firstSet,
+	//uint32_t                                    descriptorSetCount,
+	//const VkDescriptorSet* pDescriptorSets,
+	//uint32_t                                    dynamicOffsetCount,
+	//const uint32_t* pDynamicOffsets);
+	vkCmdBindDescriptorSets(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipelineLayout, 0, 1, &mComputeDescriptorSet, 0, nullptr);
+	vkCmdDispatch(currentFrame().commandBuffer, (uint32_t)std::ceil(mDrawImage.extent.width / 16.f), (uint32_t)std::ceil(mDrawImage.extent.height / 16.f), 1);
 }
 
 void KEngine::initWindow()

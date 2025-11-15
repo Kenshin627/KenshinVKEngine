@@ -13,7 +13,8 @@ void main()
 		ivec2 localCoords = ivec2(gl_LocalInvocationID.xy);
 		if(localCoords.x != 0 && localCoords.y != 0)
 		{
-			col.rg = float(texelCoords) / (size);
+			col.r = float(texelCoords.x) / (size.x);
+			col.g = float(texelCoords.y) / (size.y);
 		}
 		imageStore(image, texelCoords, col);
 	}
