@@ -43,13 +43,16 @@ void KEngine::cleanUp()
 			vkDestroyCommandPool(mDevice, mFrameData[i].commandPool, nullptr);
 			vkDestroyFence(mDevice, mFrameData[i].vkFence, nullptr);	
 			vkDestroySemaphore(mDevice, mFrameData[i].swapchainSemaphore, nullptr);
-			
+			mFrameData[i].deletionQueue.flush();
 		}
 
 		for (size_t i = 0; i < mSwapChainImageCount; i++)
 		{
 			vkDestroySemaphore(mDevice, mSignalSemaphores[i], nullptr);
 		}
+
+		mMainDeletionQueue.flush();
+
 		destroySwapChain();
 		vkDestroyDevice(mDevice, nullptr);
 		vkDestroySurfaceKHR(mVkInstance, mVkSurface, nullptr);
@@ -113,18 +116,11 @@ void KEngine::draw()
 	VK_CHECK(vkResetCommandBuffer(currentFrame().commandBuffer, 0));
 	VkCommandBufferBeginInfo beginInfo = VkInitializer::createCommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VK_CHECK(vkBeginCommandBuffer(currentFrame().commandBuffer, &beginInfo));
-	vkutil::transitionImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-	VkClearColorValue clearValue;
-	float flash = std::abs(std::sin(mFrameCounter / 120.f));
-	clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
-
-	VkImageSubresourceRange clearRange = VkInitializer::imageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-
-	//clear image
-	vkCmdClearColorImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
-
-	//make the swapchain image into presentable mode
-	vkutil::transitionImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	drawBackground();
+	vkutil::transitionImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	vkutil::transitionImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkutil::blitImage(currentFrame().commandBuffer, mDrawImage.image, mSwapChainImages[swapchainImageIndex], mDrawImage.extent, mDrawImage.extent);
+	vkutil::transitionImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	
 	VK_CHECK(vkEndCommandBuffer(currentFrame().commandBuffer));
 	
@@ -144,6 +140,7 @@ void KEngine::draw()
 	presentInfo.swapchainCount = 1;
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	VK_CHECK(vkQueuePresentKHR(mQueue, &presentInfo));
+	currentFrame().deletionQueue.flush();
 	mFrameCounter++;
 }
 
@@ -185,6 +182,17 @@ void KEngine::initVulkan()
 	mDevice = deviceRes.device;
 	mQueue = deviceRes.get_queue(vkb::QueueType::graphics).value();
 	mQueueFamilyIndex = deviceRes.get_queue_index(vkb::QueueType::graphics).value();
+
+	//vma
+	VmaAllocatorCreateInfo allocatorInfo = {};	
+	allocatorInfo.device = mDevice;
+	allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+	allocatorInfo.physicalDevice = mPhysicalDevice;
+	allocatorInfo.instance = mVkInstance;
+	vmaCreateAllocator(&allocatorInfo, &mMemAllocator);
+	mMainDeletionQueue.push_back([=]() {
+		vmaDestroyAllocator(mMemAllocator);
+	});
 }
 
 void KEngine::initSwapChain()
@@ -205,6 +213,31 @@ void KEngine::initSwapChain()
 	mSwapChainImageViews = vkbSwapChain.get_image_views().value();
 	mSwapChainExtent = vkbSwapChain.extent;
 	mSwapChainImageCount = mSwapChainImages.size();
+
+	mDrawImage.extent.width = mSwapChainExtent.width;
+	mDrawImage.extent.height = mSwapChainExtent.height;
+	mDrawImage.extent.depth = 1;
+	mDrawImage.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+
+	VkImageUsageFlags flags{};
+	flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	flags |= VK_IMAGE_USAGE_STORAGE_BIT;
+	VkImageCreateInfo imageInfo = VkInitializer::createImageInfo(mDrawImage.format, flags, mDrawImage.extent);
+	
+	VmaAllocationCreateInfo allocatorInfo {};
+	allocatorInfo.flags = 0;
+	allocatorInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	allocatorInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	vmaCreateImage(mMemAllocator, &imageInfo, &allocatorInfo, &mDrawImage.image, &mDrawImage.allocation, nullptr);
+
+	VkImageViewCreateInfo imageViewInfo = VkInitializer::createImageViewInfo(mDrawImage.image, mDrawImage.format, VK_IMAGE_ASPECT_COLOR_BIT, mDrawImage.extent);
+	vkCreateImageView(mDevice, &imageViewInfo, nullptr, &mDrawImage.imageView);
+	mMainDeletionQueue.push_back([=]() {
+		vkDestroyImageView(mDevice, mDrawImage.imageView, nullptr);
+		vmaDestroyImage(mMemAllocator, mDrawImage.image, mDrawImage.allocation);
+	});
 }
 
 void KEngine::destroySwapChain()
@@ -249,6 +282,17 @@ void KEngine::initSyncStructures()
 FrameData& KEngine::currentFrame()
 {
 	return mFrameData[(mFrameCounter + 1) % FRAME_OVERLAP];
+}
+
+void KEngine::drawBackground()
+{
+	VkClearColorValue clearValue;
+	float flash = std::abs(std::sin(mFrameCounter / 120.f));
+	clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
+
+	VkImageSubresourceRange clearRange = VkInitializer::imageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+	vkutil::transitionImage(currentFrame().commandBuffer,mDrawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+	vkCmdClearColorImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 }
 
 void KEngine::initWindow()

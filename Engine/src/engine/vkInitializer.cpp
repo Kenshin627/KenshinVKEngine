@@ -94,3 +94,32 @@ VkImageSubresourceRange VkInitializer::imageSubresourceRange(VkImageAspectFlags 
 	subImage.layerCount = VK_REMAINING_ARRAY_LAYERS;
 	return subImage;
 }
+
+VkImageCreateInfo VkInitializer::createImageInfo(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent)
+{
+	VkImageCreateInfo info{};
+	info.arrayLayers = 1;
+	info.extent = extent;
+	info.format = format;
+	info.imageType = VK_IMAGE_TYPE_2D;
+	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.mipLevels = 1;
+	info.pNext = nullptr;
+	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.usage = usageFlags;
+	return info;
+}
+
+VkImageViewCreateInfo VkInitializer::createImageViewInfo(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkExtent3D extent)
+{
+	VkImageViewCreateInfo info{};
+	info.format = format;
+	info.image = image;
+	info.pNext = nullptr;
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	info.subresourceRange = imageSubresourceRange(aspectFlags);
+	info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	return info;
+}

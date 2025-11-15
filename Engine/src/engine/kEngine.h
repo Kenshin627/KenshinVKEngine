@@ -1,17 +1,19 @@
 #pragma once
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 #include <vector>
 #include "typedef.h"
+#include "type.h"
 
 constexpr static int FRAME_OVERLAP = 2;
 
 struct FrameData
 {
-	VkCommandPool commandPool;
+	VkCommandPool	commandPool;
 	VkCommandBuffer commandBuffer;
-	VkFence vkFence;
-	VkSemaphore swapchainSemaphore;
-	//VkSemaphore renderSemaphore;
+	VkFence		    vkFence;
+	VkSemaphore		swapchainSemaphore;
+	DeletionQueue	deletionQueue;
 };
 
 struct SDL_Window;
@@ -32,6 +34,7 @@ private:
 	void initCommand();
 	void initSyncStructures();
 	FrameData& currentFrame();
+	void drawBackground();
 private:
 	bool					  mInitialized		{ false     };
 	uint					  mFrameCounter		{ 0		    };
@@ -53,4 +56,9 @@ private:
 	uint 					  mQueueFamilyIndex { 0			};
 	std::vector<VkSemaphore>  mSignalSemaphores;
 	uint					  mSwapChainImageCount;
+
+	//vma
+	VmaAllocator			  mMemAllocator{ nullptr };
+	AllocatedImage			  mDrawImage;
+	DeletionQueue			  mMainDeletionQueue;
 };

@@ -13,4 +13,6 @@ public:
 	static VkCommandBufferSubmitInfo createCommandBufferSubmitInfo(const VkCommandBuffer& commandBuffer);
 	static VkSemaphoreSubmitInfo createSemaphoreSubmitInfo(const VkSemaphore& semaphore, const VkPipelineStageFlags2& stageFlags);
 	static VkImageSubresourceRange imageSubresourceRange(VkImageAspectFlags aspectMask);
+	static VkImageCreateInfo createImageInfo(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
+	static VkImageViewCreateInfo createImageViewInfo(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkExtent3D extent);
 };
