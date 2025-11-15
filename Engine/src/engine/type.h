@@ -3,6 +3,7 @@
 #include <vk_mem_alloc.h>
 #include <deque>
 #include <functional>
+#include <glm.hpp>
 
 struct DeletionQueue
 {
@@ -28,4 +29,10 @@ struct AllocatedImage
 	VmaAllocation allocation;
 	VkFormat format;
 	VkExtent3D extent;
+};
+
+struct BackGroundPushConstants
+{
+	glm::vec4 topColor;
+	glm::vec4 bottomColor;
 };

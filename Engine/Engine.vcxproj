@@ -104,16 +104,16 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

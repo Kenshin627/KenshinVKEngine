@@ -358,8 +358,13 @@ void KEngine::initComputePipeline()
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.flags = 0;
 	pipelineLayoutInfo.pNext = nullptr;
-	pipelineLayoutInfo.pushConstantRangeCount = 0;
-	pipelineLayoutInfo.pPushConstantRanges = nullptr;
+	pipelineLayoutInfo.pushConstantRangeCount = 1;
+	VkPushConstantRange rangeInfo{};
+	rangeInfo.offset = 0;
+	rangeInfo.size = sizeof(BackGroundPushConstants);
+	rangeInfo.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	
+	pipelineLayoutInfo.pPushConstantRanges = &rangeInfo;
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &mComputeDescriptorSetLayout;
@@ -400,15 +405,21 @@ FrameData& KEngine::currentFrame()
 void KEngine::drawBackground()
 {
 	vkCmdBindPipeline(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline);
-	//VkCommandBuffer                             commandBuffer,
-	//VkPipelineBindPoint                         pipelineBindPoint,
-	//VkPipelineLayout                            layout,
-	//uint32_t                                    firstSet,
-	//uint32_t                                    descriptorSetCount,
-	//const VkDescriptorSet* pDescriptorSets,
-	//uint32_t                                    dynamicOffsetCount,
-	//const uint32_t* pDynamicOffsets);
 	vkCmdBindDescriptorSets(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipelineLayout, 0, 1, &mComputeDescriptorSet, 0, nullptr);
+
+	BackGroundPushConstants pushConstants;
+	pushConstants.topColor = { 1.0, 1.0, 1.0, 1.0 };
+	pushConstants.bottomColor = { 1.0, 1.0, 0.0, 1.0 };
+	VkPushConstantsInfo pcInfo{};
+	pcInfo.layout = mComputePipelineLayout;
+	pcInfo.offset = 0;
+	pcInfo.pNext = nullptr;
+	pcInfo.pValues = &pushConstants;
+	pcInfo.size = sizeof(BackGroundPushConstants);
+	pcInfo.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	pcInfo.sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO;
+	vkCmdPushConstants(currentFrame().commandBuffer, mComputePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BackGroundPushConstants), &pushConstants);
+
 	vkCmdDispatch(currentFrame().commandBuffer, (uint32_t)std::ceil(mDrawImage.extent.width / 16.f), (uint32_t)std::ceil(mDrawImage.extent.height / 16.f), 1);
 }
 

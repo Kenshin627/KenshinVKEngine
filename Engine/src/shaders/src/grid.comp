@@ -1,6 +1,12 @@
 #version 460 core
 
 layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform constants
+{
+	vec4 topColor;
+	vec4 bottomColor;
+} backgroundColor;
+
 layout(rgba16f, set = 0, binding = 0) uniform image2D image;
 
 void main()
@@ -13,9 +19,8 @@ void main()
 		ivec2 localCoords = ivec2(gl_LocalInvocationID.xy);
 		if(localCoords.x != 0 && localCoords.y != 0)
 		{
-			col.r = float(texelCoords.x) / (size.x);
-			col.g = float(texelCoords.y) / (size.y);
+			col = mix(backgroundColor.topColor, backgroundColor.bottomColor, float(texelCoords.y) / float(size.y));
 		}
 		imageStore(image, texelCoords, col);
 	}
-}
+} 
