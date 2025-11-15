@@ -29,10 +29,12 @@ void KEngine::init()
 	initVulkan();
 	initSwapChain();
 	initCommand();
+	initImmediateCommand();
 	initSyncStructures();
 	initDescriptorSetLayout();
 	initDescriptorSet();
 	initPipeline();
+	initDefaultData();
 	kEngine = this;
 	mInitialized = true;
 }
@@ -266,6 +268,23 @@ void KEngine::initCommand()
 	}
 }
 
+void KEngine::initImmediateCommand()
+{
+	VkCommandPoolCreateInfo poolInfo = VkInitializer::createCommandPoolInfo(mQueueFamilyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	VK_CHECK(vkCreateCommandPool(mDevice, &poolInfo, nullptr, &mImmediateSubmitPool));
+
+	VkCommandBufferAllocateInfo commandInfo = VkInitializer::createCommandBufferInfo(mImmediateSubmitPool);
+	VK_CHECK(vkAllocateCommandBuffers(mDevice, &commandInfo, &mImmediateSubmitCmd));
+
+	VkFenceCreateInfo fenceInfo = VkInitializer::createFenceInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+	VK_CHECK(vkCreateFence(mDevice, &fenceInfo, nullptr, &mImmediateSubmitFence));
+
+	mMainDeletionQueue.push_back([=]() {
+		vkDestroyCommandPool(mDevice, mImmediateSubmitPool, nullptr);
+		vkDestroyFence(mDevice, mImmediateSubmitFence, nullptr);
+	});
+}
+
 void KEngine::initSyncStructures()
 {
 	VkSemaphoreCreateInfo semaphoreInfo = VkInitializer::createSemaphoreInfo(0);
@@ -404,7 +423,7 @@ void KEngine::initGraphicPipeline()
 {
 	VkPipelineShaderStageCreateInfo vertexStages[2] = { {}, {} };
 	VkShaderModule vertexShaderModule;
-	Utils::loadShader("src/shaders/spirv/triangle.vert.spirv", mDevice, &vertexShaderModule);
+	Utils::loadShader("src/shaders/spirv/rect.vert.spirv", mDevice, &vertexShaderModule);
 	vertexStages[0].flags = 0;
 	vertexStages[0].module = vertexShaderModule;
 	vertexStages[0].pName = "main";
@@ -413,7 +432,7 @@ void KEngine::initGraphicPipeline()
 	vertexStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 
 	VkShaderModule fragmentShaderModule;
-	Utils::loadShader("src/shaders/spirv/triangle.frag.spirv", mDevice, &fragmentShaderModule);
+	Utils::loadShader("src/shaders/spirv/rect.frag.spirv", mDevice, &fragmentShaderModule);
 	vertexStages[1].flags = 0;
 	vertexStages[1].module = fragmentShaderModule;
 	vertexStages[1].pName = "main";
@@ -547,7 +566,6 @@ void KEngine::drawBackground()
 {
 	vkCmdBindPipeline(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline);
 	vkCmdBindDescriptorSets(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipelineLayout, 0, 1, &mComputeDescriptorSet, 0, nullptr);
-
 	BackGroundPushConstants pushConstants;
 	pushConstants.topColor = { 1.0, 1.0, 1.0, 1.0 };
 	pushConstants.bottomColor = { 1.0, 1.0, 0.0, 1.0 };
@@ -560,14 +578,13 @@ void KEngine::drawBackground()
 	pcInfo.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	pcInfo.sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO;
 	vkCmdPushConstants(currentFrame().commandBuffer, mComputePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BackGroundPushConstants), &pushConstants);
-
 	vkCmdDispatch(currentFrame().commandBuffer, (uint32_t)std::ceil(mDrawImage.extent.width / 16.f), (uint32_t)std::ceil(mDrawImage.extent.height / 16.f), 1);
 }
 
 void KEngine::drawGeometry()
 {
 	vkCmdBindPipeline(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mGraphicPipeline);
-
+	vkCmdBindIndexBuffer(currentFrame().commandBuffer, mMeshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 	VkViewport viewport{};
 	viewport.x = 0;
 	viewport.y = 0;
@@ -596,9 +613,108 @@ void KEngine::drawGeometry()
 	renderingInfo.renderArea.extent = { mDrawImage.extent.width, mDrawImage.extent.height };
 	renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
 	renderingInfo.viewMask = 0;
+
+	ModelStruct modelInfo;
+	modelInfo.modelMatrix = glm::mat4(1.0f);
+	modelInfo.vertexAddress = mMeshBuffer.vertexAddress;
+	vkCmdPushConstants(currentFrame().commandBuffer, mGraphicPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelStruct), &modelInfo);
 	vkCmdBeginRendering(currentFrame().commandBuffer, &renderingInfo);
-	vkCmdDraw(currentFrame().commandBuffer, 3, 1, 0, 0);
+	vkCmdDrawIndexed(currentFrame().commandBuffer, 6, 1, 0, 0, 0);
 	vkCmdEndRendering(currentFrame().commandBuffer);
+}
+
+void KEngine::immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function)
+{
+	vkResetFences(mDevice, 1, &mImmediateSubmitFence);
+	vkResetCommandBuffer(mImmediateSubmitCmd, 0);
+	VkCommandBufferBeginInfo beginInfo = VkInitializer::createCommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	VK_CHECK(vkBeginCommandBuffer(mImmediateSubmitCmd, &beginInfo));
+	function(mImmediateSubmitCmd);
+	VK_CHECK(vkEndCommandBuffer(mImmediateSubmitCmd));
+	VkCommandBufferSubmitInfo commandBufferInfo = VkInitializer::createCommandBufferSubmitInfo(mImmediateSubmitCmd);
+	VkSubmitInfo2 submitInfo = VkInitializer::createSubmitInfo(&commandBufferInfo, nullptr, nullptr);
+	VK_CHECK(vkQueueSubmit2(mQueue, 1, &submitInfo, mImmediateSubmitFence));
+	vkWaitForFences(mDevice, 1, &mImmediateSubmitFence, true, UINT64_MAX);
+}
+
+void KEngine::loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+{
+	size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+	size_t indexBufferSize = indices.size() * sizeof(uint32_t);
+
+	mMeshBuffer.vertexBuffer = VkInitializer::createBuffer(mMemAllocator, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	VkBufferDeviceAddressInfo addressInfo{};
+	addressInfo.buffer = mMeshBuffer.vertexBuffer.buffer;
+	addressInfo.pNext = nullptr;
+	addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+	mMeshBuffer.vertexAddress = vkGetBufferDeviceAddress(mDevice, &addressInfo);
+	mMeshBuffer.indexBuffer = VkInitializer::createBuffer(mMemAllocator, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	
+	AllocatedBuffer stagingBuffer = VkInitializer::createBuffer(mMemAllocator, vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+	void* mappedData = stagingBuffer.allocationInfo.pMappedData;
+	memcpy(mappedData, vertices.data(), vertexBufferSize);
+	memcpy((static_cast<char*>(mappedData) + vertexBufferSize), indices.data(), indexBufferSize);
+	immediateSubmit([&](VkCommandBuffer cmd)
+	{
+		VkBufferCopy2 copyRegion{};	
+		copyRegion.dstOffset = 0;
+		copyRegion.pNext = nullptr;
+		copyRegion.size = vertexBufferSize;
+		copyRegion.srcOffset = 0;
+		copyRegion.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+		VkCopyBufferInfo2 copyInfo{};
+		copyInfo.dstBuffer = mMeshBuffer.vertexBuffer.buffer;
+		copyInfo.pNext = nullptr;
+		copyInfo.pRegions = &copyRegion;
+		copyInfo.regionCount = 1;
+		copyInfo.srcBuffer = stagingBuffer.buffer;
+		copyInfo.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+		vkCmdCopyBuffer2(cmd, &copyInfo);
+
+		VkBufferCopy2 copyIndexRegion{};
+		copyIndexRegion.dstOffset = 0;
+		copyIndexRegion.pNext = nullptr;
+		copyIndexRegion.size = indexBufferSize;
+		copyIndexRegion.srcOffset = vertexBufferSize;
+		copyIndexRegion.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+		VkCopyBufferInfo2 copyIndexInfo{};
+		copyIndexInfo.dstBuffer = mMeshBuffer.indexBuffer.buffer;
+		copyIndexInfo.pNext = nullptr;
+		copyIndexInfo.pRegions = &copyIndexRegion;
+		copyIndexInfo.regionCount = 1;
+		copyIndexInfo.srcBuffer = stagingBuffer.buffer;
+		copyIndexInfo.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+		vkCmdCopyBuffer2(cmd, &copyIndexInfo);
+	});
+	vmaDestroyBuffer(mMemAllocator, stagingBuffer.buffer, stagingBuffer.allocation);
+}
+
+void KEngine::initDefaultData()
+{
+	std::vector<Vertex> rect_vertices(4);
+	rect_vertices[0].position = { 0.5,-0.5, 0, 1.0 };
+	rect_vertices[1].position = { 0.5,0.5, 0, 1.0 };
+	rect_vertices[2].position = { -0.5,-0.5, 0, 1.0 };
+	rect_vertices[3].position = { -0.5,0.5, 0, 1.0 };
+	rect_vertices[0].color = { 0, 0, 1, 1.0 };
+	rect_vertices[1].color = { 0.5,0.5,0.5, 1.0 };
+	rect_vertices[2].color = { 1,0, 0, 1.0 };
+	rect_vertices[3].color = { 0,1, 0, 1.0 };
+
+	std::vector<uint32_t> rect_indices(6);
+	rect_indices[0] = 0;
+	rect_indices[1] = 1;
+	rect_indices[2] = 2;
+	rect_indices[3] = 2;
+	rect_indices[4] = 1;
+	rect_indices[5] = 3;
+
+	loadMeshBuffer(rect_vertices, rect_indices);
+
+	mMainDeletionQueue.push_back([&]() {
+		vmaDestroyBuffer(mMemAllocator, mMeshBuffer.indexBuffer.buffer, mMeshBuffer.indexBuffer.allocation);
+		vmaDestroyBuffer(mMemAllocator, mMeshBuffer.vertexBuffer.buffer, mMeshBuffer.vertexBuffer.allocation);
+	});
 }
 
 void KEngine::initWindow()

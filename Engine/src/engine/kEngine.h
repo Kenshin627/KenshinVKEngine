@@ -32,6 +32,7 @@ private:
 	void initSwapChain();
 	void destroySwapChain();
 	void initCommand();
+	void initImmediateCommand();
 	void initSyncStructures();
 	void initDescriptorSetLayout();
 	void initDescriptorSet();
@@ -41,6 +42,9 @@ private:
 	FrameData& currentFrame();
 	void drawBackground();
 	void drawGeometry();
+	void immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
+	void loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+	void initDefaultData();
 private:
 	bool					  mInitialized		{ false     };
 	uint					  mFrameCounter		{ 0		    };
@@ -82,4 +86,10 @@ private:
 	VkPipelineLayout		  mGraphicPipelineLayout;
 	VkPipeline				  mGraphicPipeline;
 
+	//MeshBuffer
+	MeshBuffer				  mMeshBuffer;
+
+	VkCommandPool			  mImmediateSubmitPool{ nullptr };
+	VkCommandBuffer			  mImmediateSubmitCmd{ nullptr };
+	VkFence					  mImmediateSubmitFence{ nullptr };
 };

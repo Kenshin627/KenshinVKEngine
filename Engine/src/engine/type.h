@@ -31,6 +31,26 @@ struct AllocatedImage
 	VkExtent3D extent;
 };
 
+struct AllocatedBuffer
+{
+	VkBuffer buffer;
+	VmaAllocation allocation;
+	VmaAllocationInfo allocationInfo;
+};
+
+struct Vertex
+{
+	glm::vec4 position;
+	glm::vec4 color;
+};
+
+struct MeshBuffer
+{
+	AllocatedBuffer vertexBuffer;
+	AllocatedBuffer indexBuffer;
+	VkDeviceAddress vertexAddress;
+};
+
 struct BackGroundPushConstants
 {
 	glm::vec4 topColor;
@@ -39,6 +59,6 @@ struct BackGroundPushConstants
 
 struct ModelStruct
 {
-	glm::mat4		modelMatrix;
+	glm::mat4		modelMatrix{1.0};
 	VkDeviceAddress vertexAddress;
 };

@@ -1,4 +1,5 @@
 #include "vkInitializer.h"
+#include "core.h"
 
 VkCommandPoolCreateInfo VkInitializer::createCommandPoolInfo(int queueFamilyIndex, const VkCommandPoolCreateFlags& f)
 {
@@ -122,4 +123,22 @@ VkImageViewCreateInfo VkInitializer::createImageViewInfo(VkImage image, VkFormat
 	info.subresourceRange = imageSubresourceRange(aspectFlags);
 	info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	return info;
+}
+
+AllocatedBuffer VkInitializer::createBuffer(VmaAllocator allocator, size_t size, VkBufferUsageFlags flags, VmaMemoryUsage memoryUsage)
+{
+	AllocatedBuffer newBuffer;
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.flags = 0;
+	bufferInfo.pNext = nullptr;
+	bufferInfo.size = size;
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.usage = flags;
+	
+	VmaAllocationCreateInfo vmaInfo{};
+	vmaInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	//vmaInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	vmaInfo.usage = memoryUsage;
+	VK_CHECK(vmaCreateBuffer(allocator, &bufferInfo, &vmaInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.allocationInfo));
+	return newBuffer;
 }

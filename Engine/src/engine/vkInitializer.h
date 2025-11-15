@@ -1,5 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.h>
+#include "type.h"
 
 class VkInitializer
 {
@@ -15,4 +16,5 @@ public:
 	static VkImageSubresourceRange imageSubresourceRange(VkImageAspectFlags aspectMask);
 	static VkImageCreateInfo createImageInfo(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
 	static VkImageViewCreateInfo createImageViewInfo(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkExtent3D extent);
+	static AllocatedBuffer createBuffer(VmaAllocator allocator, size_t size, VkBufferUsageFlags flags, VmaMemoryUsage memoryUsage);
 };
