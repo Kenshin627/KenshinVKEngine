@@ -83,5 +83,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\src\grid.comp" />
+    <None Include="src\shaders\src\triangle.vert" />
+    <None Include="src\shaders\src\triangle.frag" />
   </ItemGroup>
 </Project>

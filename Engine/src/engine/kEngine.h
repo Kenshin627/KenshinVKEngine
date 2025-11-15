@@ -37,8 +37,10 @@ private:
 	void initDescriptorSet();
 	void initPipeline();
 	void initComputePipeline();
+	void initGraphicPipeline();
 	FrameData& currentFrame();
 	void drawBackground();
+	void drawGeometry();
 private:
 	bool					  mInitialized		{ false     };
 	uint					  mFrameCounter		{ 0		    };
@@ -75,4 +77,9 @@ private:
 	//compute pipeline
 	VkPipelineLayout		  mComputePipelineLayout{ nullptr };
 	VkPipeline				  mComputePipeline{ nullptr };
+
+	//graphic pipeline
+	VkPipelineLayout		  mGraphicPipelineLayout;
+	VkPipeline				  mGraphicPipeline;
+
 };

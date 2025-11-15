@@ -36,3 +36,9 @@ struct BackGroundPushConstants
 	glm::vec4 topColor;
 	glm::vec4 bottomColor;
 };
+
+struct ModelStruct
+{
+	glm::mat4		modelMatrix;
+	VkDeviceAddress vertexAddress;
+};

@@ -50,6 +50,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\src\grid.comp" />
+    <None Include="src\shaders\src\triangle.frag" />
+    <None Include="src\shaders\src\triangle.vert" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
