@@ -2,6 +2,7 @@
 #include <VkBootstrap.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#include <gtc/matrix_transform.hpp>
 #include <chrono>
 #include "core.h"
 #include "kEngine.h"
@@ -120,13 +121,13 @@ void KEngine::draw()
 	VK_CHECK(vkResetCommandBuffer(currentFrame().commandBuffer, 0));
 	VkCommandBufferBeginInfo beginInfo = VkInitializer::createCommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VK_CHECK(vkBeginCommandBuffer(currentFrame().commandBuffer, &beginInfo));
-	vkutil::transitionImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+	vkutil::transitionImage(currentFrame().commandBuffer, mDrawColorImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 	drawBackground();
-	vkutil::transitionImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	vkutil::transitionImage(currentFrame().commandBuffer, mDrawColorImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	drawGeometry();
-	vkutil::transitionImage(currentFrame().commandBuffer, mDrawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	vkutil::transitionImage(currentFrame().commandBuffer, mDrawColorImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	vkutil::transitionImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	vkutil::blitImage(currentFrame().commandBuffer, mDrawImage.image, mSwapChainImages[swapchainImageIndex], mDrawImage.extent, mDrawImage.extent);
+	vkutil::blitImage(currentFrame().commandBuffer, mDrawColorImage.image, mSwapChainImages[swapchainImageIndex], mDrawColorImage.extent, mDrawColorImage.extent);
 	vkutil::transitionImage(currentFrame().commandBuffer, mSwapChainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	
 	VK_CHECK(vkEndCommandBuffer(currentFrame().commandBuffer));
@@ -221,29 +222,19 @@ void KEngine::initSwapChain()
 	mSwapChainExtent = vkbSwapChain.extent;
 	mSwapChainImageCount = mSwapChainImages.size();
 
-	mDrawImage.extent.width = mSwapChainExtent.width;
-	mDrawImage.extent.height = mSwapChainExtent.height;
-	mDrawImage.extent.depth = 1;
-	mDrawImage.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	mDrawColorImage = VkInitializer::createImage(mDevice, mMemAllocator, VkExtent3D{ mSwapChainExtent.width, mSwapChainExtent.height, 1 }, VK_FORMAT_R16G16B16A16_SFLOAT,
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		VK_IMAGE_ASPECT_COLOR_BIT);
 
-	VkImageUsageFlags flags{};
-	flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	flags |= VK_IMAGE_USAGE_STORAGE_BIT;
-	VkImageCreateInfo imageInfo = VkInitializer::createImageInfo(mDrawImage.format, flags, mDrawImage.extent);
-	
-	VmaAllocationCreateInfo allocatorInfo {};
-	allocatorInfo.flags = 0;
-	allocatorInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	allocatorInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-	vmaCreateImage(mMemAllocator, &imageInfo, &allocatorInfo, &mDrawImage.image, &mDrawImage.allocation, nullptr);
+	mDrawDepthImage = VkInitializer::createImage(mDevice, mMemAllocator, VkExtent3D{ mSwapChainExtent.width, mSwapChainExtent.height, 1 }, VK_FORMAT_D32_SFLOAT,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VK_IMAGE_ASPECT_DEPTH_BIT);
 
-	VkImageViewCreateInfo imageViewInfo = VkInitializer::createImageViewInfo(mDrawImage.image, mDrawImage.format, VK_IMAGE_ASPECT_COLOR_BIT, mDrawImage.extent);
-	vkCreateImageView(mDevice, &imageViewInfo, nullptr, &mDrawImage.imageView);
 	mMainDeletionQueue.push_back([=]() {
-		vkDestroyImageView(mDevice, mDrawImage.imageView, nullptr);
-		vmaDestroyImage(mMemAllocator, mDrawImage.image, mDrawImage.allocation);
+		vkDestroyImageView(mDevice, mDrawColorImage.imageView, nullptr);
+		vkDestroyImageView(mDevice, mDrawDepthImage.imageView, nullptr);
+		vmaDestroyImage(mMemAllocator, mDrawColorImage.image, mDrawColorImage.allocation);
+		vmaDestroyImage(mMemAllocator, mDrawDepthImage.image, mDrawDepthImage.allocation);
 	});
 }
 
@@ -350,7 +341,7 @@ void KEngine::initDescriptorSet()
 
 	VkDescriptorImageInfo imageInfo{};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	imageInfo.imageView = mDrawImage.imageView;
+	imageInfo.imageView = mDrawColorImage.imageView;
 	imageInfo.sampler = VK_NULL_HANDLE;
 
 	VkWriteDescriptorSet writeDescriptorSet{};
@@ -393,7 +384,7 @@ void KEngine::initComputePipeline()
 
 	VK_CHECK(vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &mComputePipelineLayout));
 	VkShaderModule computeShaderModule;
-	Utils::loadShader("src/shaders/spirv/grid.comp.spirv", mDevice, &computeShaderModule);
+	Utils::loadShader("Engine/src/shaders/spirv/grid.comp.spirv", mDevice, &computeShaderModule);
 	VkPipelineShaderStageCreateInfo stageInfo{};
 	stageInfo.flags = 0;
 	stageInfo.module = computeShaderModule;
@@ -423,7 +414,7 @@ void KEngine::initGraphicPipeline()
 {
 	VkPipelineShaderStageCreateInfo vertexStages[2] = { {}, {} };
 	VkShaderModule vertexShaderModule;
-	Utils::loadShader("src/shaders/spirv/rect.vert.spirv", mDevice, &vertexShaderModule);
+	Utils::loadShader("Engine/src/shaders/spirv/rect.vert.spirv", mDevice, &vertexShaderModule);
 	vertexStages[0].flags = 0;
 	vertexStages[0].module = vertexShaderModule;
 	vertexStages[0].pName = "main";
@@ -432,7 +423,7 @@ void KEngine::initGraphicPipeline()
 	vertexStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 
 	VkShaderModule fragmentShaderModule;
-	Utils::loadShader("src/shaders/spirv/rect.frag.spirv", mDevice, &fragmentShaderModule);
+	Utils::loadShader("Engine/src/shaders/spirv/rect.frag.spirv", mDevice, &fragmentShaderModule);
 	vertexStages[1].flags = 0;
 	vertexStages[1].module = fragmentShaderModule;
 	vertexStages[1].pName = "main";
@@ -466,8 +457,9 @@ void KEngine::initGraphicPipeline()
 	blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilState{};
-	depthStencilState.depthTestEnable = VK_FALSE;
-	depthStencilState.depthWriteEnable = VK_FALSE;
+	depthStencilState.depthTestEnable = true;
+	depthStencilState.depthWriteEnable = true;
+	depthStencilState.depthCompareOp  = VK_COMPARE_OP_LESS_OR_EQUAL;
 	depthStencilState.maxDepthBounds = 1.0f;
 	depthStencilState.minDepthBounds = 0.0f;
 	depthStencilState.stencilTestEnable = VK_FALSE;
@@ -505,7 +497,7 @@ void KEngine::initGraphicPipeline()
 	rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterInfo.lineWidth = 1.0f;
 	rasterInfo.pNext = nullptr;
-	rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;;
+	rasterInfo.polygonMode = VK_POLYGON_MODE_LINE;;
 	rasterInfo.rasterizerDiscardEnable = VK_FALSE;
 	rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 
@@ -522,7 +514,8 @@ void KEngine::initGraphicPipeline()
 	VkPipelineRenderingCreateInfo renderingInfo{};
 	renderingInfo.colorAttachmentCount = 1;
 	renderingInfo.pNext = nullptr;
-	renderingInfo.pColorAttachmentFormats = &mDrawImage.format;
+	renderingInfo.pColorAttachmentFormats = &mDrawColorImage.format;
+	renderingInfo.depthAttachmentFormat = mDrawDepthImage.format;
 	renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 	renderingInfo.viewMask = 0;
 
@@ -578,48 +571,84 @@ void KEngine::drawBackground()
 	pcInfo.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	pcInfo.sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO;
 	vkCmdPushConstants(currentFrame().commandBuffer, mComputePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BackGroundPushConstants), &pushConstants);
-	vkCmdDispatch(currentFrame().commandBuffer, (uint32_t)std::ceil(mDrawImage.extent.width / 16.f), (uint32_t)std::ceil(mDrawImage.extent.height / 16.f), 1);
+	vkCmdDispatch(currentFrame().commandBuffer, (uint32_t)std::ceil(mDrawColorImage.extent.width / 16.f), (uint32_t)std::ceil(mDrawColorImage.extent.height / 16.f), 1);
 }
 
 void KEngine::drawGeometry()
 {
 	vkCmdBindPipeline(currentFrame().commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mGraphicPipeline);
-	vkCmdBindIndexBuffer(currentFrame().commandBuffer, mMeshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 	VkViewport viewport{};
 	viewport.x = 0;
 	viewport.y = 0;
-	viewport.width = mDrawImage.extent.width;
-	viewport.height = mDrawImage.extent.height;
+	viewport.width = mDrawColorImage.extent.width;
+	viewport.height = mDrawColorImage.extent.height;
 	vkCmdSetViewport(currentFrame().commandBuffer, 0, 1, &viewport);
 
 	VkRect2D scissor{};	
 	scissor.offset = { 0, 0 };
-	scissor.extent = { mDrawImage.extent.width, mDrawImage.extent.height };
+	scissor.extent = { mDrawColorImage.extent.width, mDrawColorImage.extent.height };
 	vkCmdSetScissor(currentFrame().commandBuffer, 0, 1, &scissor);
-	VkRenderingAttachmentInfo attachmentInfo{};
-	attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	attachmentInfo.imageView = mDrawImage.imageView;
-	attachmentInfo.pNext = nullptr;
-	attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+	VkRenderingAttachmentInfo colorAttachmentInfo{};
+	colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorAttachmentInfo.imageView = mDrawColorImage.imageView;
+	colorAttachmentInfo.pNext = nullptr;
+	colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+
+	VkRenderingAttachmentInfo depthAttachmentInfo{};
+	depthAttachmentInfo.clearValue.depthStencil.depth = 1.0f;
+	depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+	depthAttachmentInfo.imageView = mDrawDepthImage.imageView;
+	depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+	depthAttachmentInfo.pNext = nullptr;
+
 	VkRenderingInfo renderingInfo{};
 	renderingInfo.colorAttachmentCount = 1;
 	renderingInfo.flags = 0;
 	renderingInfo.layerCount = 1;
-	renderingInfo.pColorAttachments = &attachmentInfo;
-	renderingInfo.pDepthAttachment = nullptr;
+	renderingInfo.pColorAttachments = &colorAttachmentInfo;
+	renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 	renderingInfo.pNext = nullptr;
 	renderingInfo.pStencilAttachment = nullptr;
 	renderingInfo.renderArea.offset = { 0, 0 };
-	renderingInfo.renderArea.extent = { mDrawImage.extent.width, mDrawImage.extent.height };
+	renderingInfo.renderArea.extent = { mDrawColorImage.extent.width, mDrawColorImage.extent.height };
 	renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
 	renderingInfo.viewMask = 0;
-
-	ModelStruct modelInfo;
-	modelInfo.modelMatrix = glm::mat4(1.0f);
-	modelInfo.vertexAddress = mMeshBuffer.vertexAddress;
-	vkCmdPushConstants(currentFrame().commandBuffer, mGraphicPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelStruct), &modelInfo);
 	vkCmdBeginRendering(currentFrame().commandBuffer, &renderingInfo);
-	vkCmdDrawIndexed(currentFrame().commandBuffer, 6, 1, 0, 0, 0);
+
+
+	glm::mat4 view = glm::translate(glm::mat4(1.0), glm::vec3{ 0, 0, -3 });
+	glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)mSwapChainExtent.width / (float)mSwapChainExtent.height, 0.01f, 1000.0f);
+	glm::mat4 viewProj = projection * view;
+	projection[1][1] *= -1;
+
+	//for (auto& mesh : mMeshes)
+	//{
+	//	vkCmdBindIndexBuffer(currentFrame().commandBuffer, mesh->meshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+	//	ModelStruct modelInfo;
+	//	modelInfo.modelMatrix = viewProj;
+	//	modelInfo.vertexAddress = mesh->meshBuffer.vertexAddress;
+	//	vkCmdPushConstants(currentFrame().commandBuffer, mGraphicPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelStruct), &modelInfo);
+	//	//VkCommandBuffer                             commandBuffer,
+	//	//uint32_t                                    indexCount,
+	//	//uint32_t                                    instanceCount,
+	//	//uint32_t                                    firstIndex,
+	//	//int32_t                                     vertexOffset,
+	//	//uint32_t                                    firstInstance
+	//	for (auto& surface : mesh->surfaces)
+	//	{
+	//		vkCmdDrawIndexed(currentFrame().commandBuffer, surface.indexCount, 1, surface.startIndex, 0, 0);
+	//	}
+	//}
+	ModelStruct modelInfo;
+	modelInfo.modelMatrix = viewProj;
+	modelInfo.vertexAddress = mMeshes[2]->meshBuffer.vertexAddress;
+	
+	vkCmdPushConstants(currentFrame().commandBuffer, mGraphicPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelStruct), &modelInfo);
+	vkCmdBindIndexBuffer(currentFrame().commandBuffer, mMeshes[2]->meshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+	
+	vkCmdDrawIndexed(currentFrame().commandBuffer, mMeshes[2]->surfaces[0].indexCount, 1, mMeshes[2]->surfaces[0].startIndex, 0, 0);
 	vkCmdEndRendering(currentFrame().commandBuffer);
 }
 
@@ -637,18 +666,19 @@ void KEngine::immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& functio
 	vkWaitForFences(mDevice, 1, &mImmediateSubmitFence, true, UINT64_MAX);
 }
 
-void KEngine::loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+MeshBuffer KEngine::loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 {
+	MeshBuffer newBuffer;
 	size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
 	size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-	mMeshBuffer.vertexBuffer = VkInitializer::createBuffer(mMemAllocator, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	newBuffer.vertexBuffer = VkInitializer::createBuffer(mMemAllocator, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	VkBufferDeviceAddressInfo addressInfo{};
-	addressInfo.buffer = mMeshBuffer.vertexBuffer.buffer;
+	addressInfo.buffer = newBuffer.vertexBuffer.buffer;
 	addressInfo.pNext = nullptr;
 	addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-	mMeshBuffer.vertexAddress = vkGetBufferDeviceAddress(mDevice, &addressInfo);
-	mMeshBuffer.indexBuffer = VkInitializer::createBuffer(mMemAllocator, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	newBuffer.vertexAddress = vkGetBufferDeviceAddress(mDevice, &addressInfo);
+	newBuffer.indexBuffer = VkInitializer::createBuffer(mMemAllocator, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	
 	AllocatedBuffer stagingBuffer = VkInitializer::createBuffer(mMemAllocator, vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 	void* mappedData = stagingBuffer.allocationInfo.pMappedData;
@@ -663,7 +693,7 @@ void KEngine::loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vec
 		copyRegion.srcOffset = 0;
 		copyRegion.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
 		VkCopyBufferInfo2 copyInfo{};
-		copyInfo.dstBuffer = mMeshBuffer.vertexBuffer.buffer;
+		copyInfo.dstBuffer = newBuffer.vertexBuffer.buffer;
 		copyInfo.pNext = nullptr;
 		copyInfo.pRegions = &copyRegion;
 		copyInfo.regionCount = 1;
@@ -678,7 +708,7 @@ void KEngine::loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vec
 		copyIndexRegion.srcOffset = vertexBufferSize;
 		copyIndexRegion.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
 		VkCopyBufferInfo2 copyIndexInfo{};
-		copyIndexInfo.dstBuffer = mMeshBuffer.indexBuffer.buffer;
+		copyIndexInfo.dstBuffer = newBuffer.indexBuffer.buffer;
 		copyIndexInfo.pNext = nullptr;
 		copyIndexInfo.pRegions = &copyIndexRegion;
 		copyIndexInfo.regionCount = 1;
@@ -687,33 +717,19 @@ void KEngine::loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vec
 		vkCmdCopyBuffer2(cmd, &copyIndexInfo);
 	});
 	vmaDestroyBuffer(mMemAllocator, stagingBuffer.buffer, stagingBuffer.allocation);
+	return newBuffer;
 }
 
 void KEngine::initDefaultData()
 {
-	std::vector<Vertex> rect_vertices(4);
-	rect_vertices[0].position = { 0.5,-0.5, 0, 1.0 };
-	rect_vertices[1].position = { 0.5,0.5, 0, 1.0 };
-	rect_vertices[2].position = { -0.5,-0.5, 0, 1.0 };
-	rect_vertices[3].position = { -0.5,0.5, 0, 1.0 };
-	rect_vertices[0].color = { 0, 0, 1, 1.0 };
-	rect_vertices[1].color = { 0.5,0.5,0.5, 1.0 };
-	rect_vertices[2].color = { 1,0, 0, 1.0 };
-	rect_vertices[3].color = { 0,1, 0, 1.0 };
-
-	std::vector<uint32_t> rect_indices(6);
-	rect_indices[0] = 0;
-	rect_indices[1] = 1;
-	rect_indices[2] = 2;
-	rect_indices[3] = 2;
-	rect_indices[4] = 1;
-	rect_indices[5] = 3;
-
-	loadMeshBuffer(rect_vertices, rect_indices);
+	mMeshes = LoadGltfMeshAsserts(this, "asset/models/basicmesh.glb");
 
 	mMainDeletionQueue.push_back([&]() {
-		vmaDestroyBuffer(mMemAllocator, mMeshBuffer.indexBuffer.buffer, mMeshBuffer.indexBuffer.allocation);
-		vmaDestroyBuffer(mMemAllocator, mMeshBuffer.vertexBuffer.buffer, mMeshBuffer.vertexBuffer.allocation);
+		for (auto& mesh : mMeshes)
+		{
+			vmaDestroyBuffer(mMemAllocator, mesh->meshBuffer.indexBuffer.buffer, mesh->meshBuffer.indexBuffer.allocation);
+			vmaDestroyBuffer(mMemAllocator, mesh->meshBuffer.vertexBuffer.buffer, mesh->meshBuffer.vertexBuffer.allocation);
+		}
 	});
 }
 

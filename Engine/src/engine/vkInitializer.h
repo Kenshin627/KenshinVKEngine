@@ -17,4 +17,5 @@ public:
 	static VkImageCreateInfo createImageInfo(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
 	static VkImageViewCreateInfo createImageViewInfo(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkExtent3D extent);
 	static AllocatedBuffer createBuffer(VmaAllocator allocator, size_t size, VkBufferUsageFlags flags, VmaMemoryUsage memoryUsage);
+	static AllocatedImage createImage(VkDevice device, VmaAllocator allocator, VkExtent3D extent, VkFormat format, VkImageUsageFlags flags, VkImageAspectFlags aspect);
 };

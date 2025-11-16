@@ -42,6 +42,9 @@
     <ClCompile Include="src\engine\utils.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\engine\gltfLoader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vendor\vkBootstrap\VkBootstrap.h">
@@ -78,6 +81,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\engine\utils.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\gltfLoader.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

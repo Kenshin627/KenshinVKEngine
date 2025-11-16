@@ -142,3 +142,21 @@ AllocatedBuffer VkInitializer::createBuffer(VmaAllocator allocator, size_t size,
 	VK_CHECK(vmaCreateBuffer(allocator, &bufferInfo, &vmaInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.allocationInfo));
 	return newBuffer;
 }
+
+AllocatedImage VkInitializer::createImage(VkDevice device, VmaAllocator allocator, VkExtent3D extent, VkFormat format, VkImageUsageFlags flags, VkImageAspectFlags aspect)
+{
+	AllocatedImage newImage;	
+	newImage.extent.width  = extent.width;
+	newImage.extent.height = extent.height;
+	newImage.extent.depth  = extent.depth;
+	newImage.format = format;
+	VkImageCreateInfo imageInfo = VkInitializer::createImageInfo(newImage.format, flags, newImage.extent);
+	VmaAllocationCreateInfo allocatorInfo{};
+	allocatorInfo.flags = 0;
+	allocatorInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	allocatorInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	vmaCreateImage(allocator, &imageInfo, &allocatorInfo, &newImage.image, &newImage.allocation, &newImage.allocInfo);
+	VkImageViewCreateInfo imageViewInfo = VkInitializer::createImageViewInfo(newImage.image, newImage.format, aspect, newImage.extent);
+	vkCreateImageView(device, &imageViewInfo, nullptr, &newImage.imageView);
+	return newImage;
+}

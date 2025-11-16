@@ -27,6 +27,7 @@ struct AllocatedImage
 	VkImage image;
 	VkImageView imageView;
 	VmaAllocation allocation;
+	VmaAllocationInfo allocInfo;
 	VkFormat format;
 	VkExtent3D extent;
 };

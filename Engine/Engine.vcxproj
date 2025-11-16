@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="entryPoint.cpp" />
     <ClCompile Include="src\common\logger.cpp" />
+    <ClCompile Include="src\engine\gltfLoader.cpp" />
     <ClCompile Include="src\engine\kEngine.cpp" />
     <ClCompile Include="src\engine\utils.cpp" />
     <ClCompile Include="src\engine\vkImage.cpp" />
@@ -33,6 +34,7 @@
     <ClInclude Include="src\common\core.h" />
     <ClInclude Include="src\common\logger.h" />
     <ClInclude Include="src\common\typedef.h" />
+    <ClInclude Include="src\engine\gltfLoader.h" />
     <ClInclude Include="src\engine\kEngine.h" />
     <ClInclude Include="src\engine\type.h" />
     <ClInclude Include="src\engine\utils.h" />
@@ -44,6 +46,9 @@
     <ClInclude Include="vendor\vma\vk_mem_alloc.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\fastGltf\fastGltf.vcxproj">
+      <Project>{b771c4e5-59cf-4615-91f0-83a6ed744f16}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\sdl\VisualC\SDL\SDL.vcxproj">
       <Project>{81ce8daf-ebb2-4761-8e45-b71abcca8c68}</Project>
     </ProjectReference>
@@ -108,16 +113,16 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(solutionDir)fastGltf\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(solutionDir)fastGltf\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(solutionDir)fastGltf\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\\Include;$(solutionDir)sdl\include;$(projectDir)vendor\vkBootstrap;$(solutionDir)\Dependences\spdlog\include;$(projectDir)src\common;$(projectDir)vendor\vma;$(solutionDir)Dependences\glm;$(solutionDir)fastGltf\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

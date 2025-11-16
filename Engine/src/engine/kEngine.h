@@ -1,9 +1,11 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
+#include <memory>
 #include <vector>
 #include "typedef.h"
 #include "type.h"
+#include "gltfLoader.h"
 
 constexpr static int FRAME_OVERLAP = 2;
 
@@ -26,6 +28,7 @@ public:
 	void cleanUp();
 	void run();
 	void draw();
+	MeshBuffer loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 private:
 	void initWindow();
 	void initVulkan();
@@ -43,53 +46,51 @@ private:
 	void drawBackground();
 	void drawGeometry();
 	void immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
-	void loadMeshBuffer(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 	void initDefaultData();
 private:
-	bool					  mInitialized		{ false     };
-	uint					  mFrameCounter		{ 0		    };
-	SDL_Window*				  mWindow			{ nullptr   };
-	VkInstance				  mVkInstance		{ nullptr   };
-	VkDebugUtilsMessengerEXT  mDebugMessage		{ nullptr   };
-	VkPhysicalDevice		  mPhysicalDevice	{ nullptr   };
-	VkDevice				  mDevice		    { nullptr   };
-	VkExtent2D				  mWindowExtent		{ 1280, 720 };
-	bool					  mStopRendering	{ false		};
-	VkSurfaceKHR			  mVkSurface		{ nullptr	};
-	VkSwapchainKHR			  mVkSwapChain		{ nullptr	};
-	std::vector<VkImage>	  mSwapChainImages;
-	std::vector<VkImageView>  mSwapChainImageViews;
-	VkExtent2D				  mSwapChainExtent;
-	VkFormat				  mSwapChainImageFormat;
-	FrameData				  mFrameData[FRAME_OVERLAP];
-	VkQueue					  mQueue			{ nullptr	};
-	uint 					  mQueueFamilyIndex { 0			};
-	std::vector<VkSemaphore>  mSignalSemaphores;
-	uint					  mSwapChainImageCount;
-
-	//vma
-	VmaAllocator			  mMemAllocator{ nullptr };
-	AllocatedImage			  mDrawImage;
-	DeletionQueue			  mMainDeletionQueue;
-
-
-	//descriptorSetlayout & set & pool
-	VkDescriptorPool		  mDescriptorPool{ nullptr };	
-	VkDescriptorSetLayout     mComputeDescriptorSetLayout{ nullptr };
-	VkDescriptorSet			  mComputeDescriptorSet{ nullptr };
-
-	//compute pipeline
-	VkPipelineLayout		  mComputePipelineLayout{ nullptr };
-	VkPipeline				  mComputePipeline{ nullptr };
-
-	//graphic pipeline
-	VkPipelineLayout		  mGraphicPipelineLayout;
-	VkPipeline				  mGraphicPipeline;
-
-	//MeshBuffer
-	MeshBuffer				  mMeshBuffer;
-
-	VkCommandPool			  mImmediateSubmitPool{ nullptr };
-	VkCommandBuffer			  mImmediateSubmitCmd{ nullptr };
-	VkFence					  mImmediateSubmitFence{ nullptr };
+	bool									   mInitialized		{ false     };
+	uint									   mFrameCounter		{ 0		    };
+	SDL_Window*								   mWindow			{ nullptr   };
+	VkInstance								   mVkInstance		{ nullptr   };
+	VkDebugUtilsMessengerEXT				   mDebugMessage		{ nullptr   };
+	VkPhysicalDevice						   mPhysicalDevice	{ nullptr   };
+	VkDevice								   mDevice		    { nullptr   };
+	VkExtent2D								   mWindowExtent		{ 1280, 720 };
+	bool									   mStopRendering	{ false		};
+	VkSurfaceKHR							   mVkSurface		{ nullptr	};
+	VkSwapchainKHR							   mVkSwapChain		{ nullptr	};
+	std::vector<VkImage>					   mSwapChainImages;
+	std::vector<VkImageView>				   mSwapChainImageViews;
+	VkExtent2D								   mSwapChainExtent;
+	VkFormat								   mSwapChainImageFormat;
+	FrameData								   mFrameData[FRAME_OVERLAP];
+	VkQueue									   mQueue			{ nullptr	};
+	uint 									   mQueueFamilyIndex { 0			};
+	std::vector<VkSemaphore>				   mSignalSemaphores;
+	uint									   mSwapChainImageCount;
+											   
+	//vma									   
+	VmaAllocator							   mMemAllocator{ nullptr };
+	AllocatedImage							   mDrawColorImage;
+	AllocatedImage							   mDrawDepthImage;
+	DeletionQueue							   mMainDeletionQueue;
+											   
+											   
+	//descriptorSetlayout & se				   t & pool
+	VkDescriptorPool						   mDescriptorPool{ nullptr };	
+	VkDescriptorSetLayout					   mComputeDescriptorSetLayout{ nullptr };
+	VkDescriptorSet							   mComputeDescriptorSet{ nullptr };
+											   
+	//compute pipeline						   
+	VkPipelineLayout						   mComputePipelineLayout{ nullptr };
+	VkPipeline								   mComputePipeline{ nullptr };
+											   
+	//graphic pipeline						   
+	VkPipelineLayout						   mGraphicPipelineLayout;
+	VkPipeline								   mGraphicPipeline;
+											   
+	VkCommandPool							   mImmediateSubmitPool{ nullptr };
+	VkCommandBuffer							   mImmediateSubmitCmd{ nullptr };
+	VkFence									   mImmediateSubmitFence{ nullptr };
+	std::vector<std::shared_ptr<MeshAssert>>   mMeshes;
 };
