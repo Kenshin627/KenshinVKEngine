@@ -6,6 +6,7 @@
 #include "typedef.h"
 #include "type.h"
 #include "gltfLoader.h"
+#include "descriptor/descriptorAllocator.h"
 
 constexpr static int FRAME_OVERLAP = 2;
 
@@ -49,13 +50,13 @@ private:
 	void initDefaultData();
 private:
 	bool									   mInitialized		{ false     };
-	uint									   mFrameCounter		{ 0		    };
+	uint									   mFrameCounter	{ 0		    };
 	SDL_Window*								   mWindow			{ nullptr   };
 	VkInstance								   mVkInstance		{ nullptr   };
-	VkDebugUtilsMessengerEXT				   mDebugMessage		{ nullptr   };
+	VkDebugUtilsMessengerEXT				   mDebugMessage	{ nullptr   };
 	VkPhysicalDevice						   mPhysicalDevice	{ nullptr   };
 	VkDevice								   mDevice		    { nullptr   };
-	VkExtent2D								   mWindowExtent		{ 1280, 720 };
+	VkExtent2D								   mWindowExtent	{ 1280, 720 };
 	bool									   mStopRendering	{ false		};
 	VkSurfaceKHR							   mVkSurface		{ nullptr	};
 	VkSwapchainKHR							   mVkSwapChain		{ nullptr	};

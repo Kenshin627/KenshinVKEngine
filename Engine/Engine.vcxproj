@@ -21,6 +21,8 @@
   <ItemGroup>
     <ClCompile Include="entryPoint.cpp" />
     <ClCompile Include="src\common\logger.cpp" />
+    <ClCompile Include="src\engine\descriptor\descriptorAllocator.cpp" />
+    <ClCompile Include="src\engine\descriptor\descriptorSetlayoutBuilder.cpp" />
     <ClCompile Include="src\engine\gltfLoader.cpp" />
     <ClCompile Include="src\engine\kEngine.cpp" />
     <ClCompile Include="src\engine\utils.cpp" />
@@ -34,6 +36,8 @@
     <ClInclude Include="src\common\core.h" />
     <ClInclude Include="src\common\logger.h" />
     <ClInclude Include="src\common\typedef.h" />
+    <ClInclude Include="src\engine\descriptor\descriptorAllocator.h" />
+    <ClInclude Include="src\engine\descriptor\descriptorSetlayoutBuilder.h" />
     <ClInclude Include="src\engine\gltfLoader.h" />
     <ClInclude Include="src\engine\kEngine.h" />
     <ClInclude Include="src\engine\type.h" />
